@@ -11,6 +11,7 @@ import scala.concurrent.Future
  */
 trait ImageDao {
   def safe(publicImage: ImageDescriptor, privateImage: UnsafeHighResolution): Future[ImageDescriptor]
-  def read(id: Id[ImageDescriptor]): Future[UnsafeHighResolution]
+  def readPrivate(id: Id[ImageDescriptor]): Future[UnsafeHighResolution]
+  def readPublic(id: Id[ImageDescriptor]): Future[ImageDescriptor]
   def publish(id: Id[ImageDescriptor], publicVersion: Path): Future[ImageDescriptor]
 }

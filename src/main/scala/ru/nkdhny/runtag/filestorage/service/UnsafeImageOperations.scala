@@ -51,7 +51,7 @@ trait UnsafeImageOperations {
                 (implicit cipher: Cipher[T], dao: ImageDao, files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
     withPubicFile(encryptedOriginalPath => {
       for {
-        unsafeOriginal <- dao.read(imageId)
+        unsafeOriginal <- dao.readPrivate(imageId)
         originalData   <- lowLevelOps.read(unsafeOriginal.orig)
         encryptedVersion <- lowLevelOps.write(encryptedOriginalPath, cipher.encrypt(originalData, encryptionKey))
         updated <- dao.publish(imageId, encryptedVersion)
