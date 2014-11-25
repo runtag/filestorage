@@ -2,8 +2,7 @@ package ru.nkdhny.runtag.filestorage.service
 
 import java.nio.file.Path
 
-import scala.concurrent.{Future, ExecutionContext}
-import com.github.nscala_time.time.Imports._
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Created by alexey on 23.11.14.
@@ -17,10 +16,10 @@ trait FilePool {
 
 
   protected def publicAccess(implicit generator: UniqueGenerator): Path = {
-    generator.path(publicFileBase)
+    fileOperations.fileInDir(publicFileBase, generator.name())
   }
   protected def restrictedAccess(implicit generator: UniqueGenerator): Path = {
-    generator.path(restrictedFileBase)
+    fileOperations.fileInDir(restrictedFileBase, generator.name())
   }
   protected def persist(path: Path*) = {
     //noop

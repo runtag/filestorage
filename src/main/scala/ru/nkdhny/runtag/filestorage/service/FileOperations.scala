@@ -15,8 +15,10 @@ trait FileOperations {
   def write(where: Path, what: Array[Byte]): Future[Path]
   def read(what: Path): Future[Array[Byte]]
   def remove(what: Path)
+
   def tree(to: Path): List[Path]
   def pathFrom(root: Path, absolute:Path): Option[Path]
+  def fileInDir(dir: Path, file: String): Path
 }
 
 trait NioFileOperations extends FileOperations {
