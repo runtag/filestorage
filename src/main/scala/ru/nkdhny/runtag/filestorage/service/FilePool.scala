@@ -16,10 +16,10 @@ trait FilePool {
 
 
   protected def publicAccess(implicit generator: UniqueGenerator): Path = {
-    fileOperations.fileInDir(publicFileBase, generator.name())
+    fileOperations.relativize(publicFileBase, generator.name())
   }
   protected def restrictedAccess(implicit generator: UniqueGenerator): Path = {
-    fileOperations.fileInDir(restrictedFileBase, generator.name())
+    fileOperations.relativize(restrictedFileBase, generator.name())
   }
   protected def persist(path: Path*) = {
     //noop

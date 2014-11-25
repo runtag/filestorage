@@ -2,7 +2,7 @@ package ru.nkdhny.runtag.filestorage.service
 
 import java.nio.ByteBuffer
 import java.nio.channels.{WritableByteChannel, ReadableByteChannel}
-import java.nio.file.{StandardOpenOption, OpenOption, Files, Path}
+import java.nio.file._
 
 import scala.collection.mutable
 import scala.concurrent.{Future, promise}
@@ -16,9 +16,12 @@ trait FileOperations {
   def read(what: Path): Future[Array[Byte]]
   def remove(what: Path)
 
+  /*
+  Step from root to path
+   */
   def tree(to: Path): List[Path]
-  def pathFrom(root: Path, absolute:Path): Option[Path]
-  def fileInDir(dir: Path, file: String): Path
+  def resolve(root: Path, absolute:Path): Option[Path]
+  def relativize(dir: Path, file: String): Path
 }
 
 trait NioFileOperations extends FileOperations {
@@ -65,4 +68,25 @@ trait NioFileOperations extends FileOperations {
   }
 
   override def remove(what: Path): Unit = Files.delete(what)
+
+  override def tree(to: Path): List[Path] = {
+
+    def doStepBack(path: Path): List[Path] = {
+      if(path != null) {
+        path::doStepBack(path.getParent)
+      } else {
+        Nil
+      }
+    }
+
+    doStepBack(to).reverse
+  }
+
+  override def resolve(root: Path, absolute: Path): Option[Path] = {
+    Try(absolute.relativize(root)).toOption
+  }
+
+  override def relativize(dir: Path, file: String): Path = {
+    dir.resolve(file)
+  }
 }
