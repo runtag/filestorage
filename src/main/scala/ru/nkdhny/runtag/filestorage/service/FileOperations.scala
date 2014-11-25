@@ -14,6 +14,7 @@ import scala.util.{Failure, Success, Try}
 trait FileOperations {
   def write(where: Path, what: Array[Byte]): Future[Path]
   def read(what: Path): Future[Array[Byte]]
+  def remove(what: Path)
 }
 
 trait NioFileOperations extends FileOperations {
@@ -58,4 +59,6 @@ trait NioFileOperations extends FileOperations {
 
     ret.future
   }
+
+  override def remove(what: Path): Unit = Files.delete(what)
 }

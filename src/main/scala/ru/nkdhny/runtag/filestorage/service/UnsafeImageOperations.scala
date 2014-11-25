@@ -16,7 +16,7 @@ trait UnsafeImageOperations {
   import FilePool._
 
   def safeOriginal(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[UnsafeHighResolution] = {
-    persistAfterOperation (originalPath => {
+    withRestrictedFile (originalPath => {
       for {
         original <- lowLevelOps.write(originalPath, input)
       } yield {
@@ -25,7 +25,7 @@ trait UnsafeImageOperations {
     })
   }
   def safeSizes(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
-    persistAfterOperation((thumbnailPath, previewPath) =>
+    withPublicFiles((thumbnailPath, previewPath) =>
     {
       for {
         thumbnailData <- lowLevelOps.thumbnail(input)
@@ -49,7 +49,7 @@ trait UnsafeImageOperations {
   }
   def publish[T](imageId: Id[ImageDescriptor], encryptionKey: T)
                 (implicit cipher: Cipher[T], dao: ImageDao, files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
-    persistAfterOperation(encryptedOriginalPath => {
+    withPubicFile(encryptedOriginalPath => {
       for {
         unsafeOriginal <- dao.read(imageId)
         originalData   <- lowLevelOps.read(unsafeOriginal.orig)
