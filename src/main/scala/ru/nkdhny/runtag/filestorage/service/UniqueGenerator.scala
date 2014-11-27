@@ -20,7 +20,6 @@ trait UUIDUniqueGenerator extends UniqueGenerator {
   protected def uniqueString: String = UUID.randomUUID().toString
 
   override def id[T](): Id[T] = Id(uniqueString)
-
   override def name(): String = uniqueString
 
 }

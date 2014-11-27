@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.{WritableByteChannel, ReadableByteChannel}
 import java.nio.file._
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.{Future, promise}
 import scala.util.{Failure, Success, Try}
@@ -25,22 +26,13 @@ trait FileOperations {
 }
 
 trait NioFileOperations extends FileOperations {
-  private val readBufferSize = 1024
 
   def read(what: Path) = {
     val ret = promise[Array[Byte]]()
-    Try(Files.newByteChannel(what, StandardOpenOption.READ)) match {
+    Try(Files.readAllBytes(what)) match {
 
-      case Success(channel: ReadableByteChannel) =>
-        val builder = mutable.ArrayBuilder.make[Byte]()
-        val buffer = ByteBuffer.allocate(readBufferSize)
-        while (channel.read(buffer) > 0) {
-          buffer.rewind()
-          builder++=buffer.array()
-          buffer.flip()
-        }
-        channel.close()
-        ret success builder.result()
+      case Success(bytes: Array[Byte]) =>
+        ret success bytes
 
       case Failure(t: Throwable) =>
         ret failure t
@@ -52,13 +44,10 @@ trait NioFileOperations extends FileOperations {
   override def write(where: Path, what: Array[Byte]): Future[Path] = {
     val ret = promise[Path]()
 
-    Try(Files.newByteChannel(where, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) match {
+    Try(Files.write(where, what, StandardOpenOption.TRUNCATE_EXISTING)) match {
 
-      case Success(channel: WritableByteChannel) =>
-        val buffer = ByteBuffer.wrap(what)
-        channel.write(buffer)
-        channel.close()
-        ret success where
+      case Success(written: Path) =>
+        ret success written
 
       case Failure(t: Throwable) =>
         ret failure t
@@ -70,12 +59,12 @@ trait NioFileOperations extends FileOperations {
   override def remove(what: Path): Unit = Files.delete(what)
 
   override def tree(to: Path): List[Path] = {
-
-    def doStepBack(path: Path): List[Path] = {
+    @tailrec
+    def doStepBack(path: Path, visited: List[Path] = Nil): List[Path] = {
       if(path != null) {
-        path::doStepBack(path.getParent)
+        doStepBack(path.getParent, path::visited)
       } else {
-        Nil
+        visited
       }
     }
 
