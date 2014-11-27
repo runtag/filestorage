@@ -4,7 +4,7 @@ import ru.nkdhny.runtag.filestorage.cipher.Cipher
 import ru.nkdhny.runtag.filestorage.db.dao.ImageDao
 import ru.nkdhny.runtag.filestorage.domain.{Id, ImageDescriptor, UnsafeHighResolution}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
  * Created by alexey on 23.11.14.
@@ -14,6 +14,8 @@ trait UnsafeImageOperations {
   lowLevelOps: LowLevelImageOperations with FileOperations =>
 
   import FilePool._
+
+  implicit val executionContext: ExecutionContext
 
   def safeOriginal(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[UnsafeHighResolution] = {
     withRestrictedFile (originalPath => {

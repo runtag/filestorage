@@ -44,7 +44,7 @@ trait NioFileOperations extends FileOperations {
   override def write(where: Path, what: Array[Byte]): Future[Path] = {
     val ret = promise[Path]()
 
-    Try(Files.write(where, what, StandardOpenOption.TRUNCATE_EXISTING)) match {
+    Try(Files.write(where, what, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) match {
 
       case Success(written: Path) =>
         ret success written
