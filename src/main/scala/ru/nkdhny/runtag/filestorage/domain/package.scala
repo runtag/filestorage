@@ -42,33 +42,4 @@ package object domain {
     orig: Path
   )
 
-  object ImageDescriptor extends SQLSyntaxSupport[ImageDescriptor] {
-    override val tableName = "public_images"
-
-    def fromRelative
-      (id: Id[ImageDescriptor], thumbnail: Path, preview: Path, safeHighResolution: Option[Path])
-      (implicit config: ConfigSupport, files: FileOperations) : ImageDescriptor = {
-      val root = config.root
-      ImageDescriptor(
-        id,
-        files.resolve(root, thumbnail),
-        files.resolve(root, preview),
-        safeHighResolution.map(files.resolve(root, _)))
-    }
-
-
-    def apply(c: ResultName[ImageDescriptor])(rs: WrappedResultSet) = {
-      fromRelative(
-        Id(rs.get[String](c.id)),
-        Paths.get(rs.get[String](c.thumbnail)),
-        Paths.get(rs.get[String](c.preview)),
-        Option(rs.get[String](c.fullSize)).map(Paths.get(_)))
-    }
-
-  }
-
-  object UnsafeHighResolution extends SQLSyntaxSupport[UnsafeHighResolution] {
-    override val tableName = "private_image"
-  }
-
 }
