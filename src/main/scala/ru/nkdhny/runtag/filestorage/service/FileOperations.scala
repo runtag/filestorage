@@ -21,8 +21,8 @@ trait FileOperations {
   Step from root to path
    */
   def tree(to: Path): List[Path]
-  def resolve(root: Path, absolute:Path): Option[Path]
-  def relativize(dir: Path, file: String): Path
+  def resolve(root: Path, relative:Path): Path
+  def relativize(dir: Path, file: Path): Option[Path]
 }
 
 trait NioFileOperations extends FileOperations {
@@ -44,7 +44,7 @@ trait NioFileOperations extends FileOperations {
   override def write(where: Path, what: Array[Byte]): Future[Path] = {
     val ret = promise[Path]()
 
-    Try(Files.write(where, what, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) match {
+    Try(Files.write(where, what)) match {
 
       case Success(written: Path) =>
         ret success written
@@ -71,11 +71,11 @@ trait NioFileOperations extends FileOperations {
     doStepBack(to).reverse
   }
 
-  override def resolve(root: Path, absolute: Path): Option[Path] = {
+  override def relativize(root: Path, absolute: Path): Option[Path] = {
     Try(absolute.relativize(root)).toOption
   }
 
-  override def relativize(dir: Path, file: String): Path = {
+  override def resolve(dir: Path, file: Path): Path = {
     dir.resolve(file)
   }
 }

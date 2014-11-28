@@ -10,14 +10,16 @@ libraryDependencies ++= {
   val akkaV = "2.1.4"
   val sprayV = "1.1.1"
   Seq(
-    "io.spray"            %   "spray-can"     % sprayV,
-    "io.spray"            %%  "spray-json"    % "1.2.6",
-    "io.spray"            %   "spray-routing" % sprayV,
-    "io.spray"            %   "spray-testkit" % sprayV  % "test",
-    "com.typesafe.akka"   %%  "akka-actor"    % akkaV,
-    "com.typesafe.akka"   %%  "akka-testkit"  % akkaV   % "test",
-    "org.specs2"          %%  "specs2"        % "2.2.3" % "test",
-    "com.github.nscala-time" %% "nscala-time" % "1.2.0",
-    "org.mockito"          %   "mockito-all"   % "1.9.5"
+    "io.spray"            %   "spray-can"        % sprayV,
+    "io.spray"            %%  "spray-json"       % "1.2.6",
+    "io.spray"            %   "spray-routing"    % sprayV,
+    "io.spray"            %   "spray-testkit"    % sprayV  % "test",
+    "com.typesafe.akka"   %%  "akka-actor"       % akkaV,
+    "com.typesafe.akka"   %%  "akka-testkit"     % akkaV   % "test",
+    "org.specs2"          %%  "specs2"           % "2.2.3" % "test",
+    "com.github.nscala-time" %% "nscala-time"    % "1.2.0",
+    "org.mockito"          %   "mockito-all"     % "1.9.5",
+    "com.github.mauricio" %% "postgresql-async"  % "0.2.+",
+    "org.scalikejdbc"     %% "scalikejdbc-async" % "0.5.+"
   )
 }
