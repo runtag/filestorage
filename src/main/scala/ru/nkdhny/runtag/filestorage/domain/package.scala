@@ -67,4 +67,8 @@ package object domain {
 
   }
 
+  object UnsafeHighResolution extends SQLSyntaxSupport[UnsafeHighResolution] {
+    override val tableName = "private_image"
+  }
+
 }
