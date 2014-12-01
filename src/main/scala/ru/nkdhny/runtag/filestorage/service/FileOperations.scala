@@ -4,6 +4,8 @@ import java.nio.ByteBuffer
 import java.nio.channels.{WritableByteChannel, ReadableByteChannel}
 import java.nio.file._
 
+import ru.nkdhny.runtag.filestorage.service.FileOperations
+
 import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.concurrent.{Future, promise}
@@ -72,7 +74,7 @@ trait NioFileOperations extends FileOperations {
   }
 
   override def relativize(root: Path, absolute: Path): Option[Path] = {
-    Try(absolute.relativize(root)).toOption
+    Try(root.relativize(absolute)).toOption
   }
 
   override def resolve(dir: Path, file: Path): Path = {

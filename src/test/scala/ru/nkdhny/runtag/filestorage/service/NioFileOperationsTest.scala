@@ -47,11 +47,25 @@ class NioFileOperationsTest extends Specification {
     }
 
     "resolve a file in a directory" in {
-      val root = Paths.get("./src/test/resources/")
+      val root = Paths.get("/root")
 
-      val p = fileOperations.relativize(root, "sample")
+      val p = fileOperations.relativize(root, Paths.get("/root/src/test/resources/sample"))
 
-      p must beEqualTo(Paths.get("./src/test/resources/sample"))
+      p must beSome
+      p.get must beEqualTo(Paths.get("src/test/resources/sample"))
+    }
+
+    "build a tree" in {
+      val tree = fileOperations.tree(Paths.get("/one/two/tree/end"))
+
+      tree must have size(5)
+      tree must haveTheSameElementsAs(
+        Paths.get("/")::
+        Paths.get("/one")::
+        Paths.get("/one/two")::
+        Paths.get("/one/two/tree")::
+        Paths.get("/one/two/tree/end")::Nil
+      )
     }
   }
 

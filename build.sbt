@@ -4,12 +4,13 @@ version := "1.0.0-SNAPSHOT"
 
 scalaVersion := "2.10.3"
 
-scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8")
+scalacOptions := Seq("-unchecked", "-deprecation", "-encoding", "utf8","-Xmax-classfile-name", "255")
 
 libraryDependencies ++= {
   val akkaV = "2.1.4"
   val sprayV = "1.1.1"
   Seq(
+    "ru.nkdhny"           %%  "photo-processor-java-support" % "0.1-SNAPSHOT",
     "io.spray"            %   "spray-can"        % sprayV,
     "io.spray"            %%  "spray-json"       % "1.2.6",
     "io.spray"            %   "spray-routing"    % sprayV,

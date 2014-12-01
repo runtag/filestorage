@@ -10,7 +10,7 @@ import scala.concurrent.Future
  */
 trait SafeImageOperations {
 
-  def descriptorFor(id: Id[ImageDescriptor])(implicit dao: ImageDao): Future[ImageDescriptor] = {
+  def descriptorFor(id: Id[ImageDescriptor])(implicit dao: ImageDao): Future[Option[ImageDescriptor]] = {
     dao.readPublic(id)
   }
 }

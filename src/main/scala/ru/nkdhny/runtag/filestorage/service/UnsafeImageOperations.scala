@@ -5,6 +5,7 @@ import ru.nkdhny.runtag.filestorage.db.dao.ImageDao
 import ru.nkdhny.runtag.filestorage.domain.{Id, ImageDescriptor, UnsafeHighResolution}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.promise
 
 /**
  * Created by alexey on 23.11.14.
@@ -18,48 +19,52 @@ trait UnsafeImageOperations {
   implicit val executionContext: ExecutionContext
 
   def safeOriginal(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[UnsafeHighResolution] = {
-    withRestrictedFile (originalPath => {
-      for {
-        original <- lowLevelOps.write(originalPath, input)
-      } yield {
+      lowLevelOps.write(files.restrictedAccess, input).map(original => {
         UnsafeHighResolution(generator.id(), original)
-      }
     })
   }
   def safeSizes(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
     withPublicFiles((thumbnailPath, previewPath) =>
     {
-      for {
-        thumbnailData <- lowLevelOps.thumbnail(input)
-        previewData <- lowLevelOps.preview(input)
-        thumbnail <- lowLevelOps.write(thumbnailPath, thumbnailData)
-        preview <- lowLevelOps.write(previewPath, previewData)
-      } yield {
-        ImageDescriptor(generator.id(), thumbnail, preview, None)
-      }
+        lowLevelOps.thumbnail(input)
+          .zip(lowLevelOps.preview(input))
+          .flatMap(tp => {
+            lowLevelOps.write(thumbnailPath, tp._1) zip lowLevelOps.write(previewPath, tp._2)
+          }).map(tp => ImageDescriptor(generator.id(), tp._1, tp._2, None))
+
     })
   }
 
   def safe(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator, dao: ImageDao): Future[ImageDescriptor] = {
-    for {
-      originalVersion <- lowLevelOps.safeOriginal(input)
-      publicVersion   <- lowLevelOps.safeSizes(input)
-      storedPublicVersion  <- dao.safe(publicVersion, originalVersion)
-    } yield {
-      storedPublicVersion
-    }
+      lowLevelOps.safeOriginal(input) zip lowLevelOps.safeSizes(input) flatMap (op => {
+        dao.safe(op._2, op._1)
+      })
   }
+
+  def flatten[T](maybeT: Future[Option[T]]):Future[T] = {
+    val ret = promise[T]()
+
+    maybeT.onSuccess {
+      case Some(t) => ret success t
+      case _ => ret failure new IllegalStateException("Value expected")
+    }
+
+    maybeT onFailure {
+      case t: Throwable => ret failure t
+    }
+
+    ret.future
+  }
+
   def publish[T](imageId: Id[ImageDescriptor], encryptionKey: T)
                 (implicit cipher: Cipher[T], dao: ImageDao, files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
+
+
     withPubicFile(encryptedOriginalPath => {
-      for {
-        unsafeOriginal <- dao.readPrivate(imageId)
-        originalData   <- lowLevelOps.read(unsafeOriginal.orig)
-        encryptedVersion <- lowLevelOps.write(encryptedOriginalPath, cipher.encrypt(originalData, encryptionKey))
-        updated <- dao.publish(imageId, encryptedVersion)
-      } yield {
-        updated
-      }
+        flatten(dao.readPrivate(imageId)).flatMap(p => lowLevelOps.read(p.orig))
+                                         .flatMap(p=> lowLevelOps.write(encryptedOriginalPath, cipher.encrypt(p, encryptionKey)))
+                                         .flatMap(encrypted => dao.publish(imageId, encrypted))
+
     })
   }
 }

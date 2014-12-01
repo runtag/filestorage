@@ -28,10 +28,10 @@ trait NginxFilePublisher extends FilePublisher {
 
     prefixes.find(served.contains) match {
       case Some(servedRootPath) => {
-        fileOperations.resolve(servedRootPath, path) match {
-          case Some(documentPath) => result success relative(served(servedRootPath), documentPath)
-          case _                  => result failure new IllegalStateException(s"${path.toString} should be child of ${servedRootPath.toString}")
-        }
+
+        val documentPath = fileOperations.resolve(servedRootPath, path)
+        result success relative(served(servedRootPath), documentPath)
+
       }
       case _ => result failure new IllegalArgumentException(s"${path.toString} is not served")
     }
