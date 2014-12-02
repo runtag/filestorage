@@ -18,19 +18,21 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
   config: ConfigSupport=>
 
   implicit val executionContext: ExecutionContext
+  implicit val fileOperations: FileOperations
 
   object ImageDescriptorSyntax extends SQLSyntaxSupport[ImageDescriptor] {
-    override val tableName = "public_images"
+    override val tableName = "public_image"
+    override val columns = "id"::"thumbnail"::"preview"::"safe_high_resolution"::"original_id"::Nil
   }
 
   object UnsafeHighResolutionSyntax extends SQLSyntaxSupport[UnsafeHighResolution] {
     override val tableName = "private_image"
+    override val columns = "id"::"orig"::Nil
   }
 
 
   val i = ImageDescriptorSyntax.syntax("i")
   val u = UnsafeHighResolutionSyntax.syntax("u")
-  implicit val fileOperations: FileOperations
 
   override def readPublic(id: Id[ImageDescriptor]): Future[Option[ImageDescriptor]] = {
     def resolveOptionalPath(rs: WrappedResultSet): Option[Path] = {
@@ -57,14 +59,15 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
 
   override def safe(publicImage: ImageDescriptor, privateImage: UnsafeHighResolution): Future[ImageDescriptor] = {
 
-    def persistImageDescriptor(image: ImageDescriptor, original: UnsafeHighResolution)(implicit s: AsyncDBSession): Future[ImageDescriptor] = {
+    def persistImageDescriptor(image: ImageDescriptor, original: UnsafeHighResolution)
+                              (implicit s: AsyncDBSession): Future[ImageDescriptor] = {
       val ret = promise[ImageDescriptor]()
 
       val thumbnail = fileOperations.relativize(config.publicRoot, publicImage.thumbnail)
         .map(_.toString)
 
 
-      val preview = fileOperations.relativize(config.publicRoot, publicImage.thumbnail)
+      val preview = fileOperations.relativize(config.publicRoot, publicImage.preview)
         .map(_.toString)
 
       val highRes = publicImage.safeHighResolution
@@ -84,7 +87,7 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       }
 
 
-      paths.future
+      val insert_result = paths.future
         .flatMap(tps=> withSQL {
           insert.into(ImageDescriptorSyntax)
               .values(
@@ -94,19 +97,21 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
                 tps._3,
                 original.id)
           }.update())
-        .map(rows_updated => {
-          val readTask = readPublic(image.id)
-          readTask onSuccess  {
-            case Some(written: ImageDescriptor) =>
-              ret success written
-            case _ =>
-              ret failure new IllegalStateException(s"Saved $rows_updated rows but public image with id ${image.id} was not found")
-          }
 
-          readTask onFailure {
-            case t: Throwable => ret failure t
-          }
-        })
+      insert_result onSuccess {
+        case rows_updated: Int if rows_updated == 1 =>
+          ret success image
+        case rows_updated: Int if rows_updated == 0 =>
+          ret failure new IllegalStateException(s"Was unable to save public image with id ${image.id}, nothing has been written")
+        case _ =>
+          ret failure new IllegalStateException(s"Was unable to save public image with id ${image.id}")
+
+      }
+
+      insert_result onFailure {
+        case t: Throwable => ret failure t
+      }
+
 
       ret.future
     }
@@ -121,22 +126,29 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       }
 
 
-        relative_path.future
-          .flatMap(p => withSQL {
-            insert.into(UnsafeHighResolutionSyntax).values(
-              original.id,
-              p
-            )
-            }.update())
-          .map( rows_updated=> {
-            if(rows_updated == 1) {
-              ret success original
-            } else if(rows_updated > 0) {
-              ret failure new IllegalStateException(s"after insert is performed $rows_updated rows were touched")
-            } else {
-              ret failure new IllegalStateException(s"Insert was performed but nothing updated")
-            }
-          })
+      val insert_result = relative_path.future
+        .flatMap(p => withSQL {
+          insert.into(UnsafeHighResolutionSyntax).values(
+            original.id,
+            p
+          )
+          }.update())
+
+      insert_result onSuccess {
+        case rows_updated: Int => {
+          if (rows_updated == 1) {
+            ret success original
+          } else if (rows_updated > 0) {
+            ret failure new IllegalStateException(s"after insert is performed $rows_updated rows were touched")
+          } else {
+            ret failure new IllegalStateException(s"Insert was performed but nothing updated")
+          }
+        }
+      }
+
+      insert_result onFailure {
+        case t: Throwable => ret failure t
+      }
 
       ret.future
     }
@@ -157,7 +169,7 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       withSQL {
         select.from(UnsafeHighResolutionSyntax as u)
           .join(ImageDescriptorSyntax as i)
-          .on(sqls"u.id = i.original_id")
+          .on(u.id, i.column("original_id"))
           .where.eq(i.id, id)
       }.map(rs => {
         UnsafeHighResolution(
@@ -171,28 +183,32 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
   override def publish(id: Id[ImageDescriptor], publicVersion: Path): Future[ImageDescriptor] = {
     val ret = promise[ImageDescriptor]()
 
-    AsyncDB.withPool(implicit s => {
-      for {
-        rows_updated <- withSQL {
-          update(ImageDescriptorSyntax).where.eq(i.id, id)
-        }.update()
-      } yield {
-        if(rows_updated == 1) {
-          val readTask = readPublic(id)
-
-          readTask onSuccess {
-            case Some(updated: ImageDescriptor) =>  ret success updated
-            case _ => ret failure new IllegalArgumentException(s"Image with id $id was updated but not found")
-          }
-
-          readTask onFailure {
-            case t: Throwable => ret failure t
-          }
-        } else {
-          ret failure new IllegalArgumentException(s"Unable to publish image, image with id $id not found")
-        }
-      }
+    val update_result = AsyncDB.withPool(implicit s => {
+     withSQL {
+        update(ImageDescriptorSyntax).set(i.safeHighResolution -> publicVersion.toString).where.eq(i.id, id)
+      }.update()
     })
+
+    update_result onSuccess {
+      case rows_updated: Int if rows_updated == 1 =>
+        val readTask = readPublic(id)
+
+        readTask onSuccess {
+          case Some(updated: ImageDescriptor) => ret success updated
+          case _ => ret failure new IllegalArgumentException(s"Image with id $id was updated but not found")
+        }
+
+        readTask onFailure {
+          case t: Throwable => ret failure t
+        }
+
+      case rows_updated: Int if rows_updated == 0 => ret failure new IllegalArgumentException(s"Nothing updated with id: $id")
+    }
+
+    update_result onFailure {
+      case t: Throwable => ret failure t
+    }
+
 
     ret.future
   }

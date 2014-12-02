@@ -37,17 +37,15 @@ class HttpFilePublisherTest extends Specification{
       served.get must beEqualTo(new URI("http://served/third/file"))
     }
 
-    "find a deep nested file" in {
-      "find a nested served file" in {
-        val served = Await.result(puplisher(Paths.get("/first/deep/nested/file")), 1.0 seconds)
-        served must beSome
-        served.get must beEqualTo(new URI("http://served/first/deep/nested/file"))
-      }
+    "find a deep nested served file" in {
+      val served = Await.result(puplisher(Paths.get("/first/deep/nested/file")), 1.0 seconds)
+      served must beSome
+      served.get must beEqualTo(new URI("http://served/first/deep/nested/file"))
+    }
 
-      "return none for files not been served" in {
-        val served = Await.result(puplisher(Paths.get("/private/deep/nested/file")), 1.0 seconds)
-        served must beNone
-      }
+    "return none for files not been served" in {
+      val served = Await.result(puplisher(Paths.get("/private/deep/nested/file")), 1.0 seconds)
+      served must beNone
     }
 
   }
