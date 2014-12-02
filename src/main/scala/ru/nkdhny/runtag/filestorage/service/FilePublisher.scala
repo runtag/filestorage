@@ -1,6 +1,6 @@
 package ru.nkdhny.runtag.filestorage.service
 
-import java.net.URL
+import java.net.{URI, URL}
 import java.nio.file.Path
 
 import scala.concurrent.Future
@@ -9,5 +9,5 @@ import scala.concurrent.Future
  * Created by alexey on 25.11.14.
  */
 trait FilePublisher {
-  def publish(path: Path): Future[URL]
+  def apply(path: Path): Future[Option[URI]]
 }

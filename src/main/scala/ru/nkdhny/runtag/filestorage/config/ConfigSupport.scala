@@ -7,5 +7,7 @@ import java.nio.file.Path
  */
 trait ConfigSupport {
 
-  def root: Path
+  def publicRoot: Path
+  def privateRoot: Path
+  def waterMarkText: String
 }

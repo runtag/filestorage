@@ -2,6 +2,8 @@ package ru.nkdhny.runtag.filestorage.service
 
 import java.nio.file.{Paths, Path}
 
+import ru.nkdhny.runtag.filestorage.config.ConfigSupport
+
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -9,17 +11,13 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 trait FilePool {
 
-  fileOperations: FileOperations =>
-
-  val publicFileBase: Path
-  val restrictedFileBase: Path
-
+  self: FileOperations with ConfigSupport =>
 
   def publicAccess(implicit generator: UniqueGenerator): Path = {
-    fileOperations.resolve(publicFileBase, Paths.get(generator.name()))
+    self.resolve(self.publicRoot, Paths.get(generator.name()))
   }
   def restrictedAccess(implicit generator: UniqueGenerator): Path = {
-    fileOperations.resolve(restrictedFileBase, Paths.get(generator.name()))
+    self.resolve(self.privateRoot, Paths.get(generator.name()))
   }
   def persist(path: Path*) = {
     //noop
@@ -29,7 +27,7 @@ trait FilePool {
     for {
       p <- path
     } {
-      fileOperations.remove(p)
+      self.remove(p)
     }
   }
 
@@ -37,20 +35,23 @@ trait FilePool {
 }
 
 object FilePool {
-  def withPubicFile[T](op: Path => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
-    val tmp = pool.publicAccess
-    val ret = op(tmp)
+  object withPubicFile {
 
-    ret onSuccess {case _ => pool.persist(tmp)}
-    ret onFailure {case _ => pool.rollback(tmp)}
+    def apply[T](op: Path => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
+      val tmp = pool.publicAccess
+      val ret = op(tmp)
 
-    ret
+      ret onSuccess { case _ => pool.persist(tmp)}
+      ret onFailure { case _ => pool.rollback(tmp)}
+
+      ret
+    }
   }
 
 
   object withRestrictedFile {
     def apply[T](op: Path => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
-      val tmp = pool.publicAccess
+      val tmp = pool.restrictedAccess
       val ret = op(tmp)
 
       ret onSuccess { case _ => pool.persist(tmp)}
