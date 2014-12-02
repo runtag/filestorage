@@ -38,10 +38,28 @@ class PostgreScalikeImageDaoImplTest extends Specification {
           ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), None),
           UnsafeHighResolution(Id("private"), Paths.get("/private/original"))
         ),
-        100.0 seconds
+        1.0 second
       )
 
-      true must beTrue
+      val pub = Await.result(
+        dao.readPublic(Id("public")),
+        1.0 second
+      )
+
+      val priv = Await.result(
+        dao.readPrivate(Id("public")),
+        1.0 second
+      )
+
+      pub.get must beEqualTo(ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), None))
+      priv.get must beEqualTo(UnsafeHighResolution(Id("private"), Paths.get("/private/original")))
+
+      val updated = Await.result(
+        dao.publish(Id("public"), Paths.get("/public/highres")),
+        1.0 second
+      )
+
+      updated must beEqualTo(ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), Some(Paths.get("/public/highres"))))
     }
   }
 

@@ -36,7 +36,7 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
 
   override def readPublic(id: Id[ImageDescriptor]): Future[Option[ImageDescriptor]] = {
     def resolveOptionalPath(rs: WrappedResultSet): Option[Path] = {
-      rs.get[Option[String]](i.safeHighResolution)
+      rs.stringOpt(i.resultName.safeHighResolution)
         .map(Paths.get(_))
         .map(fileOperations.resolve(config.publicRoot, _))
     }
@@ -47,9 +47,9 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       }.map(rs => {
 
         ImageDescriptor(
-          Id(rs.get[String](i.id)),
-          fileOperations.resolve(config.publicRoot, Paths.get(rs.get[String](i.thumbnail))),
-          fileOperations.resolve(config.publicRoot, Paths.get(rs.get[String](i.preview))),
+          Id(rs.string(i.resultName.id)),
+          fileOperations.resolve(config.publicRoot, Paths.get(rs.string(i.resultName.thumbnail))),
+          fileOperations.resolve(config.publicRoot, Paths.get(rs.string(i.resultName.preview))),
           resolveOptionalPath(rs)
         )
       })
@@ -173,8 +173,8 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
           .where.eq(i.id, id)
       }.map(rs => {
         UnsafeHighResolution(
-          Id(rs.get[String](u.id)),
-          fileOperations.resolve(config.privateRoot, Paths.get(rs.get[String](u.orig)))
+          Id(rs.string(u.resultName.id)),
+          fileOperations.resolve(config.privateRoot, Paths.get(rs.string(u.resultName.orig)))
         )
       })
     )
@@ -185,7 +185,8 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
 
     val update_result = AsyncDB.withPool(implicit s => {
      withSQL {
-        update(ImageDescriptorSyntax).set(i.safeHighResolution -> publicVersion.toString).where.eq(i.id, id)
+        update(ImageDescriptorSyntax).set(ImageDescriptorSyntax.column.safeHighResolution -> publicVersion.toString)
+          .where.eq(ImageDescriptorSyntax.column.id, id)
       }.update()
     })
 
