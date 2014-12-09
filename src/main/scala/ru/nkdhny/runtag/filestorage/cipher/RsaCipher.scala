@@ -1,21 +1,34 @@
 package ru.nkdhny.runtag.filestorage.cipher
 
-import java.security.PublicKey
-import javax.crypto.Cipher
+import java.security.spec.X509EncodedKeySpec
+import java.security.{KeyFactory, PublicKey}
+import javax.crypto.{Cipher =>JCipher}
 
-import ru.nkdhny.runtag.filestorage.cipher.RsaCipher.RsaPublicKey
+import ru.nkdhny.runtag.filestorage.cipher.Cipher.KeyGenerator
+
 
 /**
  * Created by alexey on 25.11.14.
  */
-object RsaCipher {
-  case class RsaPublicKey(key: PublicKey)
-}
+object Rsa {
 
-class RsaCipher extends Cipher[RsaPublicKey] {
-  val cipher = Cipher.getInstance("RSA")
-  override def encrypt(input: Array[Byte], key: RsaPublicKey): Array[Byte] = {
-    cipher.init(Cipher.ENCRYPT_MODE, key.key)
-    cipher.doFinal(input)
+
+  case class RsaPublicKey(key: PublicKey)
+
+  implicit val rsaKeyGenerator = new KeyGenerator[RsaPublicKey] {
+    override def apply(bytes: Array[Byte]): RsaPublicKey =
+      RsaPublicKey(
+        KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(bytes))
+      )
   }
+
+  implicit object RsaCipher extends Cipher[RsaPublicKey] {
+    val cipher = JCipher.getInstance("RSA")
+
+    override def encrypt(input: Array[Byte], key: RsaPublicKey): Array[Byte] = {
+      cipher.init(JCipher.ENCRYPT_MODE, key.key)
+      cipher.doFinal(input)
+    }
+  }
+
 }

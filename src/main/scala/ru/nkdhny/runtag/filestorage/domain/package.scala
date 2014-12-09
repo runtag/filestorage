@@ -32,14 +32,21 @@ package object domain {
 
   case class ImageDescriptor(
     id: Id[ImageDescriptor],
-    thumbnail: Path,
-    preview: Path,
-    safeHighResolution: Option[Path]
+    thumbnail: PublicPath,
+    preview: PublicPath,
+    safeHighResolution: Option[PublicPath]
   )
 
   case class UnsafeHighResolution(
     id: Id[UnsafeHighResolution],
-    orig: Path
+    orig: PrivatePath
   )
 
+  case class PublicPath(value: Path)
+  case class PrivatePath(value: Path)
+
+  object PathImplicits {
+    implicit def publicPathToPath(p: PublicPath): Path = p.value
+    implicit def privatePathToPath(p: PrivatePath): Path = p.value
+  }
 }

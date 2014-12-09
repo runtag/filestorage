@@ -1,24 +1,59 @@
-package ru.nkdhny.runtag.filestorage.db.dao
+package ru.nkdhny.runtag.filestorage.db
 
 /**
  * Created by alexey on 28.11.14.
  */
 
 import java.nio.file.{Path, Paths}
+import java.sql.ResultSet
 
 import ru.nkdhny.runtag.filestorage.config.ConfigSupport
 import ru.nkdhny.runtag.filestorage.domain._
 import ru.nkdhny.runtag.filestorage.service.FileOperations
 import scalikejdbc._
-import async._, FutureImplicits._
+import scalikejdbc.async.FutureImplicits._
+import scalikejdbc.async._
 
 import scala.concurrent._
+
 
 trait PostgreScalikeAsyncImageDao extends ImageDao {
   config: ConfigSupport=>
 
+  import ru.nkdhny.runtag.filestorage.domain.PathImplicits._
+
+
   implicit val executionContext: ExecutionContext
   implicit val fileOperations: FileOperations
+
+  implicit def getId[T]: TypeBinder[Id[T]] = new TypeBinder[Id[T]] {
+    override def apply(rs: ResultSet, columnIndex: Int): Id[T] = Id(rs.getString(columnIndex))
+
+    override def apply(rs: ResultSet, columnLabel: String): Id[T] = Id(rs.getString(columnLabel))
+  }
+
+  implicit val getPublicPath: TypeBinder[PublicPath] = new TypeBinder[PublicPath] {
+
+    override def apply(rs: ResultSet, columnIndex: Int): PublicPath = {
+      PublicPath(fileOperations.resolve(config.publicRoot, Paths.get(rs.getString(columnIndex))))
+    }
+
+    override def apply(rs: ResultSet, columnLabel: String): PublicPath = {
+      PublicPath(fileOperations.resolve(config.publicRoot, Paths.get(rs.getString(columnLabel))))
+    }
+  }
+
+  implicit val getPrivatePath: TypeBinder[PrivatePath] = new TypeBinder[PrivatePath] {
+
+    override def apply(rs: ResultSet, columnIndex: Int): PrivatePath = {
+      PrivatePath(fileOperations.resolve(config.privateRoot, Paths.get(rs.getString(columnIndex))))
+    }
+
+    override def apply(rs: ResultSet, columnLabel: String): PrivatePath = {
+      PrivatePath(fileOperations.resolve(config.privateRoot, Paths.get(rs.getString(columnLabel))))
+    }
+  }
+
 
   object ImageDescriptorSyntax extends SQLSyntaxSupport[ImageDescriptor] {
     override val tableName = "public_image"
@@ -35,11 +70,6 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
   val u = UnsafeHighResolutionSyntax.syntax("u")
 
   override def readPublic(id: Id[ImageDescriptor]): Future[Option[ImageDescriptor]] = {
-    def resolveOptionalPath(rs: WrappedResultSet): Option[Path] = {
-      rs.stringOpt(i.resultName.safeHighResolution)
-        .map(Paths.get(_))
-        .map(fileOperations.resolve(config.publicRoot, _))
-    }
 
     AsyncDB.withPool(implicit s => {
       withSQL {
@@ -47,10 +77,10 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       }.map(rs => {
 
         ImageDescriptor(
-          Id(rs.string(i.resultName.id)),
-          fileOperations.resolve(config.publicRoot, Paths.get(rs.string(i.resultName.thumbnail))),
-          fileOperations.resolve(config.publicRoot, Paths.get(rs.string(i.resultName.preview))),
-          resolveOptionalPath(rs)
+          rs.get[Id[ImageDescriptor]](i.resultName.id),
+          rs.get[PublicPath](i.resultName.thumbnail),
+          rs.get[PublicPath](i.resultName.preview),
+          rs.get[Option[PublicPath]](i.resultName.safeHighResolution)
         )
       })
     })
@@ -174,14 +204,14 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
       }.map(rs => {
         UnsafeHighResolution(
           Id(rs.string(u.resultName.id)),
-          fileOperations.resolve(config.privateRoot, Paths.get(rs.string(u.resultName.orig)))
+          rs.get[PrivatePath](u.resultName.orig)
         )
       })
     )
   }
 
-  override def publish(id: Id[ImageDescriptor], publicVersion: Path): Future[ImageDescriptor] = {
-    val ret = promise[ImageDescriptor]()
+  override def publish(id: Id[ImageDescriptor], publicVersion: Path): Future[Option[ImageDescriptor]] = {
+    val ret = promise[Option[ImageDescriptor]]()
 
     val update_result = AsyncDB.withPool(implicit s => {
      withSQL {
@@ -195,7 +225,7 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
         val readTask = readPublic(id)
 
         readTask onSuccess {
-          case Some(updated: ImageDescriptor) => ret success updated
+          case Some(updated: ImageDescriptor) => ret success Option(updated)
           case _ => ret failure new IllegalArgumentException(s"Image with id $id was updated but not found")
         }
 
@@ -203,7 +233,7 @@ trait PostgreScalikeAsyncImageDao extends ImageDao {
           case t: Throwable => ret failure t
         }
 
-      case rows_updated: Int if rows_updated == 0 => ret failure new IllegalArgumentException(s"Nothing updated with id: $id")
+      case rows_updated: Int if rows_updated == 0 => ret success None
     }
 
     update_result onFailure {

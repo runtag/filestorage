@@ -21,6 +21,6 @@ libraryDependencies ++= {
     "com.github.nscala-time" %% "nscala-time"    % "1.2.0",
     "org.mockito"          %   "mockito-all"     % "1.9.5",
     "com.github.mauricio" %% "postgresql-async"  % "0.2.+",
-    "org.scalikejdbc"     %% "scalikejdbc-async" % "0.5.+"
+    "org.scalikejdbc"     %% "scalikejdbc-async" % "0.5.4-SNAPSHOT"
   )
 }

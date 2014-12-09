@@ -1,8 +1,8 @@
 package ru.nkdhny.runtag.filestorage.service
 
 import ru.nkdhny.runtag.filestorage.cipher.Cipher
-import ru.nkdhny.runtag.filestorage.db.dao.ImageDao
-import ru.nkdhny.runtag.filestorage.domain.{Id, ImageDescriptor, UnsafeHighResolution}
+import ru.nkdhny.runtag.filestorage.db.ImageDao
+import ru.nkdhny.runtag.filestorage.domain._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.promise
@@ -10,27 +10,30 @@ import scala.concurrent.promise
 /**
  * Created by alexey on 23.11.14.
  */
-trait UnsafeImageOperations {
+trait UnsafeImageOperations[T] {
 
-  lowLevelOps: LowLevelImageOperations with FileOperations =>
+  lowLevelOps: LowLevelImageOperations  =>
 
   import FilePool._
 
+  implicit val fileOperations: FileOperations
   implicit val executionContext: ExecutionContext
+  implicit val keyGenerator: Cipher.KeyGenerator[T]
+  implicit val cipher: Cipher[T]
 
-  def safeOriginal(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[UnsafeHighResolution] = {
-      lowLevelOps.write(files.restrictedAccess, input).map(original => {
-        UnsafeHighResolution(generator.id(), original)
+  private def safeOriginal(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[UnsafeHighResolution] = {
+    withRestrictedFile(file => fileOperations.write(file, input)).map(original => {
+        UnsafeHighResolution(generator.id(), PrivatePath(original))
     })
   }
-  def safeSizes(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
+  private def safeSizes(input: Array[Byte])(implicit files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
     withPublicFiles((thumbnailPath, previewPath) =>
     {
         lowLevelOps.thumbnail(input)
           .zip(lowLevelOps.preview(input))
           .flatMap(tp => {
-            lowLevelOps.write(thumbnailPath, tp._1) zip lowLevelOps.write(previewPath, tp._2)
-          }).map(tp => ImageDescriptor(generator.id(), tp._1, tp._2, None))
+          fileOperations.write(thumbnailPath, tp._1) zip fileOperations.write(previewPath, tp._2)
+          }).map(tp => ImageDescriptor(generator.id(), PublicPath(tp._1), PublicPath(tp._2), None))
 
     })
   }
@@ -41,7 +44,7 @@ trait UnsafeImageOperations {
       })
   }
 
-  def flatten[T](maybeT: Future[Option[T]]):Future[T] = {
+  private def flatten[T](maybeT: Future[Option[T]]):Future[T] = {
     val ret = promise[T]()
 
     maybeT.onSuccess {
@@ -56,13 +59,14 @@ trait UnsafeImageOperations {
     ret.future
   }
 
-  def publish[T](imageId: Id[ImageDescriptor], encryptionKey: T)
-                (implicit cipher: Cipher[T], dao: ImageDao, files: FilePool, generator: UniqueGenerator): Future[ImageDescriptor] = {
+  def publish(imageId: Id[ImageDescriptor], encryptionKey: Array[Byte])
+                (implicit dao: ImageDao, files: FilePool, generator: UniqueGenerator):
+  Future[Option[ImageDescriptor]] = {
 
 
     withPubicFile(encryptedOriginalPath => {
-        flatten(dao.readPrivate(imageId)).flatMap(p => lowLevelOps.read(p.orig))
-                                         .flatMap(p=> lowLevelOps.write(encryptedOriginalPath, cipher.encrypt(p, encryptionKey)))
+        flatten(dao.readPrivate(imageId)).flatMap(p => fileOperations.read(p.orig.value))
+                                         .flatMap(p=> fileOperations.write(encryptedOriginalPath, Cipher(p, encryptionKey)))
                                          .flatMap(encrypted => dao.publish(imageId, encrypted))
 
     })

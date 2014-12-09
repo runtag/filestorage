@@ -15,11 +15,16 @@ trait UniqueGenerator {
   def name(): String
 }
 
-trait UUIDUniqueGenerator extends UniqueGenerator {
+object UniqueGenerator {
 
-  protected def uniqueString: String = UUID.randomUUID().toString
+  implicit object UUIDUniqueGenerator extends UniqueGenerator {
 
-  override def id[T](): Id[T] = Id(uniqueString)
-  override def name(): String = uniqueString
+    protected def uniqueString: String = UUID.randomUUID().toString
+
+    override def id[T](): Id[T] = Id(uniqueString)
+
+    override def name(): String = uniqueString
+
+  }
 
 }

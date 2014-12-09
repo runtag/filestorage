@@ -2,7 +2,7 @@ package ru.nkdhny.runtag.filestorage.service
 
 import java.nio.file.{Paths, Path}
 
-import ru.nkdhny.runtag.filestorage.config.ConfigSupport
+import ru.nkdhny.runtag.filestorage.config.{InheritConfig, ConfigSupport}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -11,23 +11,23 @@ import scala.concurrent.{ExecutionContext, Future}
  */
 trait FilePool {
 
-  self: FileOperations with ConfigSupport =>
+  self: ConfigSupport =>
 
-  def publicAccess(implicit generator: UniqueGenerator): Path = {
-    self.resolve(self.publicRoot, Paths.get(generator.name()))
+  def publicAccess(implicit generator: UniqueGenerator, fileOperations: FileOperations): Path = {
+    fileOperations.resolve(self.publicRoot, Paths.get(generator.name()))
   }
-  def restrictedAccess(implicit generator: UniqueGenerator): Path = {
-    self.resolve(self.privateRoot, Paths.get(generator.name()))
+  def restrictedAccess(implicit generator: UniqueGenerator, fileOperations: FileOperations): Path = {
+    fileOperations.resolve(self.privateRoot, Paths.get(generator.name()))
   }
-  def persist(path: Path*) = {
+  def persist(path: Path*)(implicit fileOperations: FileOperations) = {
     //noop
   }
 
-  def rollback(path: Path*) = {
+  def rollback(path: Path*)(implicit fileOperations: FileOperations) = {
     for {
       p <- path
     } {
-      self.remove(p)
+      fileOperations.remove(p)
     }
   }
 
@@ -35,14 +35,21 @@ trait FilePool {
 }
 
 object FilePool {
+
+  def apply(config: ConfigSupport): FilePool = {
+    new FilePool with InheritConfig {
+      override val config: ConfigSupport = config
+    }
+  }
+
   object withPubicFile {
 
-    def apply[T](op: Path => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
-      val tmp = pool.publicAccess
+    def apply[T](op: Path => Future[T])(implicit pool: FilePool, operations: FileOperations, generator: UniqueGenerator, context: ExecutionContext) = {
+      val tmp = pool.publicAccess(generator, operations)
       val ret = op(tmp)
 
-      ret onSuccess { case _ => pool.persist(tmp)}
-      ret onFailure { case _ => pool.rollback(tmp)}
+      ret onSuccess { case _ => pool.persist(tmp)(operations)}
+      ret onFailure { case _ => pool.rollback(tmp)(operations)}
 
       ret
     }
@@ -50,12 +57,12 @@ object FilePool {
 
 
   object withRestrictedFile {
-    def apply[T](op: Path => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
-      val tmp = pool.restrictedAccess
+    def apply[T](op: Path => Future[T])(implicit pool: FilePool, operations: FileOperations, generator: UniqueGenerator, context: ExecutionContext) = {
+      val tmp = pool.restrictedAccess(generator, operations)
       val ret = op(tmp)
 
-      ret onSuccess { case _ => pool.persist(tmp)}
-      ret onFailure { case _ => pool.rollback(tmp)}
+      ret onSuccess { case _ => pool.persist(tmp)(operations)}
+      ret onFailure { case _ => pool.rollback(tmp)(operations)}
 
       ret
     }
@@ -63,15 +70,23 @@ object FilePool {
 
   object withPublicFiles {
 
-    def apply[T](op: (Path, Path) => Future[T])(implicit pool: FilePool, generator: UniqueGenerator, context: ExecutionContext) = {
-      val tmp1 = pool.publicAccess
-      val tmp2 = pool.publicAccess
+    def apply[T](op: (Path, Path) => Future[T])(implicit pool: FilePool, operations: FileOperations, generator: UniqueGenerator, context: ExecutionContext) = {
+      val tmp1 = pool.publicAccess(generator, operations)
+      val tmp2 = pool.publicAccess(generator, operations)
       val ret = op(tmp1, tmp2)
 
-      ret onSuccess { case _ => pool.persist(tmp1, tmp2)}
-      ret onFailure { case _ => pool.rollback(tmp1, tmp2)}
+      ret onSuccess { case _ => pool.persist(tmp1, tmp2)(operations)}
+      ret onFailure { case _ => pool.rollback(tmp1, tmp2)(operations)}
 
       ret
+    }
+  }
+
+  object withTemporaryFile {
+    def apply[T](op: Path => Future[T])(implicit operations: FileOperations, context: ExecutionContext) = {
+      val tmp = operations.temp
+
+      op.apply(tmp)
     }
   }
 }

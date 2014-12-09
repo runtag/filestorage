@@ -15,23 +15,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class FilePoolTest extends Specification with Mockito {
 
 
-  def filePool = new FilePool with DelegatingFileOperations with ConfigSupport {
-    val operations: FileOperations = mock[FileOperations]
 
-    operations.resolve(any[Path], any[Path]) answers((params, m) => {
-      params.asInstanceOf[Array[Any]](0).asInstanceOf[Path]
-        .resolve(params.asInstanceOf[Array[Any]](1).asInstanceOf[Path])
-    })
 
-    override val fileOperationsDelegate: FileOperations = operations
+  def filePool = new FilePool with NoopConfig {
 
     override def publicRoot: Path = Paths.get("/public")
-
     override def privateRoot: Path = Paths.get("/private")
-
     override def waterMarkText: String = "some text"
-
-
   }
 
 
@@ -41,6 +31,12 @@ class FilePoolTest extends Specification with Mockito {
     "persist  public file after successful operation" in {
       implicit val pool = filePool
       implicit val generator = mock[UniqueGenerator]
+      implicit val operations: FileOperations = mock[FileOperations]
+
+      operations.resolve(any[Path], any[Path]) answers((params, m) => {
+        params.asInstanceOf[Array[Any]](0).asInstanceOf[Path]
+          .resolve(params.asInstanceOf[Array[Any]](1).asInstanceOf[Path])
+      })
 
       generator.name() returns("file")
 
@@ -51,11 +47,17 @@ class FilePoolTest extends Specification with Mockito {
           //noop
         }
       })
-      there was no(pool.operations).remove(Paths.get("/public/file"))
+      there was no(operations).remove(Paths.get("/public/file"))
     }
     "persist  restricted file after successful operation" in {
       implicit val pool = filePool
       implicit val generator = mock[UniqueGenerator]
+      implicit val operations: FileOperations = mock[FileOperations]
+
+      operations.resolve(any[Path], any[Path]) answers((params, m) => {
+        params.asInstanceOf[Array[Any]](0).asInstanceOf[Path]
+          .resolve(params.asInstanceOf[Array[Any]](1).asInstanceOf[Path])
+      })
 
       generator.name() returns("file")
 
@@ -66,11 +68,17 @@ class FilePoolTest extends Specification with Mockito {
           //noop
         }
       })
-      there was no(pool.operations).remove(Paths.get("/public/file"))
+      there was no(operations).remove(Paths.get("/public/file"))
     }
     "remove a file with failed operation" in {
       implicit val pool = filePool
       implicit val generator = mock[UniqueGenerator]
+      implicit val operations: FileOperations = mock[FileOperations]
+
+      operations.resolve(any[Path], any[Path]) answers((params, m) => {
+        params.asInstanceOf[Array[Any]](0).asInstanceOf[Path]
+          .resolve(params.asInstanceOf[Array[Any]](1).asInstanceOf[Path])
+      })
 
       generator.name() returns("file")
 
@@ -81,7 +89,7 @@ class FilePoolTest extends Specification with Mockito {
           throw new Exception()
         }
       })
-      there was one(pool.operations).remove(Paths.get("/public/file"))
+      there was one(operations).remove(Paths.get("/public/file"))
     }
   }
 }

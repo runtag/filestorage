@@ -1,10 +1,12 @@
 package ru.nkdhny.runtag.filestorage.service
 
+import java.net.URI
 import java.nio.file.{Paths, Path}
 
+import akka.actor.ActorPath
 import org.specs2.mutable._
 import ru.nkdhny.runtag.filestorage.config.ConfigSupport
-import ru.nkdhny.runtag.filestorage.db.dao.PostgreScalikeAsyncImageDao
+import ru.nkdhny.runtag.filestorage.db.PostgreScalikeAsyncImageDao
 import ru.nkdhny.runtag.filestorage.domain._
 import scalikejdbc.async.AsyncConnectionPool
 
@@ -22,7 +24,7 @@ class PostgreScalikeImageDaoImplTest extends Specification {
     )
 
     val dao = new PostgreScalikeAsyncImageDao with ConfigSupport {
-      override implicit val fileOperations: FileOperations = new NioFileOperations {}
+      override implicit val fileOperations: FileOperations = FileOperations.NioFileOperations
       override implicit val executionContext: ExecutionContext = ExecutionContext.global
 
       override def publicRoot: Path = Paths.get("/public")
@@ -30,13 +32,19 @@ class PostgreScalikeImageDaoImplTest extends Specification {
       override def privateRoot: Path = Paths.get("/private")
 
       override def waterMarkText: String = "some text"
+
+      override def imageBackendPath: ActorPath = ???
+      override def served: Map[Path, URI] = ???
+      override def imageFrontendPath: ActorPath = ???
+      override def backendTimeout: FiniteDuration = ???
+      override def servicePort: Int = ???
     }
 
     "save a pair of public and private image" in {
       Await.result(
         dao.safe(
-          ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), None),
-          UnsafeHighResolution(Id("private"), Paths.get("/private/original"))
+          ImageDescriptor(Id("public"), PublicPath(Paths.get("/public/thumbnail")), PublicPath(Paths.get("/public/preview")), None),
+          UnsafeHighResolution(Id("private"), PrivatePath(Paths.get("/private/original")))
         ),
         1.0 second
       )
@@ -51,15 +59,16 @@ class PostgreScalikeImageDaoImplTest extends Specification {
         1.0 second
       )
 
-      pub.get must beEqualTo(ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), None))
-      priv.get must beEqualTo(UnsafeHighResolution(Id("private"), Paths.get("/private/original")))
+      pub.get must beEqualTo(ImageDescriptor(Id("public"), PublicPath(Paths.get("/public/thumbnail")), PublicPath(Paths.get("/public/preview")), None))
+      priv.get must beEqualTo(UnsafeHighResolution(Id("private"), PrivatePath(Paths.get("/private/original"))))
 
       val updated = Await.result(
         dao.publish(Id("public"), Paths.get("/public/highres")),
         1.0 second
       )
 
-      updated must beEqualTo(ImageDescriptor(Id("public"), Paths.get("/public/thumbnail"), Paths.get("/public/preview"), Some(Paths.get("/public/highres"))))
+      updated must beSome
+      updated.get must beEqualTo(ImageDescriptor(Id("public"), PublicPath(Paths.get("/public/thumbnail")), PublicPath(Paths.get("/public/preview")), Some(PublicPath(Paths.get("/public/highres")))))
     }
   }
 

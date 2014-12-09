@@ -4,7 +4,7 @@ import java.security.KeyPairGenerator
 import javax.crypto.Cipher
 
 import org.specs2.mutable._
-import ru.nkdhny.runtag.filestorage.cipher.RsaCipher
+import ru.nkdhny.runtag.filestorage.cipher.Rsa._
 
 import scala.util.Try
 
@@ -20,9 +20,7 @@ class RsaCipherTest extends Specification {
       val keyPair = keyPairFactory.generateKeyPair()
       val original = "This is original string" getBytes("UTF8")
 
-      val cipher = new RsaCipher()
-
-      val crypted = cipher.encrypt(original, RsaCipher.RsaPublicKey(keyPair.getPublic))
+      val crypted = RsaCipher.encrypt(original, RsaPublicKey(keyPair.getPublic))
 
       crypted mustNotEqual(original)
 

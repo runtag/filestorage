@@ -13,7 +13,7 @@ class NioFileOperationsTest extends Specification {
 
   "Nio file operations" should {
 
-    val fileOperations = new NioFileOperations {}
+    val fileOperations = FileOperations.NioFileOperations
 
     "read a file as a byte array" in {
       val  bytes = Await.result(fileOperations.read(Paths.get("./src/test/resources/sample")), 1.0 seconds)

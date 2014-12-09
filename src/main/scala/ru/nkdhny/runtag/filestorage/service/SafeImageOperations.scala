@@ -1,6 +1,6 @@
 package ru.nkdhny.runtag.filestorage.service
 
-import ru.nkdhny.runtag.filestorage.db.dao.ImageDao
+import ru.nkdhny.runtag.filestorage.db.ImageDao
 import ru.nkdhny.runtag.filestorage.domain.{ImageDescriptor, Id}
 
 import scala.concurrent.Future
